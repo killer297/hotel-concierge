@@ -1,0 +1,2 @@
+import {NextResponse} from 'next/server';import {db} from '@/lib/db';import {requireHotelAdmin} from '@/lib/auth';import {api} from '@/lib/http';
+export async function GET(){return api(async()=>{const u=await requireHotelAdmin();const groups=await db.serviceRequest.groupBy({by:['status'],where:{hotelId:u.hotelId!},_count:true});return NextResponse.json(groups,{headers:{'Cache-Control':'no-store'}})})}

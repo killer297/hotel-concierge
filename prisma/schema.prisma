@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  HOTEL_ADMIN
+  MANAGER
+  STAFF
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum RequestStatus {
+  NEW
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum QrStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Hotel {
+  id             String            @id @default(cuid())
+  name           String
+  slug           String            @unique
+  logoUrl        String?
+  address        String?
+  phone          String?
+  email          String?
+  timezone       String            @default("Asia/Kolkata")
+  status         Status            @default(ACTIVE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  rooms          Room[]
+  users          User[]
+  sessions       GuestSession[]
+  categories     ServiceCategory[]
+  services       Service[]
+  requests       ServiceRequest[]
+  menuCategories MenuCategory[]
+  menuItems      MenuItem[]
+  info           HotelInfo?
+  offers         Offer[]
+  feedback       Feedback[]
+  subscriptions  Subscription[]
+}
+
+model Room {
+  id         String           @id @default(cuid())
+  hotelId    String
+  roomNumber String
+  roomName   String?
+  status     Status           @default(ACTIVE)
+  qrToken    String           @unique
+  qrStatus   QrStatus         @default(ACTIVE)
+  hotel      Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  sessions   GuestSession[]
+  requests   ServiceRequest[]
+  feedback   Feedback[]
+
+  @@unique([hotelId, roomNumber])
+}
+
+model User {
+  id            String         @id @default(cuid())
+  hotelId       String?
+  name          String
+  email         String         @unique
+  passwordHash  String
+  phone         String?
+  role          UserRole       @default(STAFF)
+  status        Status         @default(ACTIVE)
+  hotel         Hotel?         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  requestEvents RequestEvent[]
+  authSessions  AuthSession[]
+}
+
+model GuestSession {
+  id           String           @id @default(cuid())
+  hotelId      String
+  roomId       String
+  sessionToken String           @unique
+  expiresAt    DateTime
+  startedAt    DateTime         @default(now())
+  lastSeenAt   DateTime         @updatedAt
+  hotel        Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room         Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  requests     ServiceRequest[]
+}
+
+model ServiceCategory {
+  id        String    @id @default(cuid())
+  hotelId   String
+  name      String
+  sortOrder Int       @default(0)
+  active    Boolean   @default(true)
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  services  Service[]
+}
+
+model Service {
+  id               String           @id @default(cuid())
+  hotelId          String
+  categoryId       String?
+  name             String
+  description      String?
+  icon             String?
+  price            Decimal?         @db.Decimal(10, 2)
+  estimatedMinutes Int              @default(15)
+  active           Boolean          @default(true)
+  hotel            Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  category         ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  requests         ServiceRequest[]
+}
+
+model ServiceRequest {
+  id          String         @id @default(cuid())
+  hotelId     String
+  roomId      String
+  sessionId   String?
+  serviceId   String
+  quantity    Int            @default(1)
+  note        String?
+  status      RequestStatus  @default(NEW)
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+  hotel       Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  session     GuestSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  service     Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  events      RequestEvent[]
+  feedback    Feedback?
+}
+
+model RequestEvent {
+  id        String         @id @default(cuid())
+  requestId String
+  status    RequestStatus
+  note      String?
+  changedBy String?
+  createdAt DateTime       @default(now())
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user      User?          @relation(fields: [changedBy], references: [id], onDelete: SetNull)
+}
+
+model MenuCategory {
+  id        String     @id @default(cuid())
+  hotelId   String
+  name      String
+  sortOrder Int        @default(0)
+  active    Boolean    @default(true)
+  hotel     Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id          String        @id @default(cuid())
+  hotelId     String
+  categoryId  String?
+  name        String
+  description String?
+  price       Decimal       @db.Decimal(10, 2)
+  imageUrl    String?
+  active      Boolean       @default(true)
+  hotel       Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  category    MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+}
+
+model HotelInfo {
+  id            String  @id @default(cuid())
+  hotelId       String  @unique
+  wifiName      String?
+  wifiPassword  String?
+  breakfastTime String?
+  checkinTime   String?
+  checkoutTime  String?
+  policies      String?
+  facilities    String?
+  hotel         Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model Offer {
+  id          String   @id @default(cuid())
+  hotelId     String
+  title       String
+  description String?
+  imageUrl    String?
+  validFrom   DateTime
+  validTo     DateTime
+  active      Boolean  @default(true)
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model Feedback {
+  id        String          @id @default(cuid())
+  hotelId   String
+  roomId    String
+  requestId String?         @unique
+  rating    Int
+  comment   String?
+  createdAt DateTime        @default(now())
+  hotel     Hotel           @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room      Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  request   ServiceRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+}
+
+model Subscription {
+  id        String    @id @default(cuid())
+  hotelId   String
+  planId    String
+  status    String    @default("ACTIVE")
+  startDate DateTime
+  endDate   DateTime?
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginThrottle {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+}

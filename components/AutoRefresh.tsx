@@ -1,0 +1,1 @@
+'use client';import {useEffect} from 'react';import {useRouter} from 'next/navigation';export default function AutoRefresh(){const r=useRouter();useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')r.refresh()},10000);return()=>clearInterval(timer)},[r]);return null}
